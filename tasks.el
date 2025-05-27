@@ -47,12 +47,49 @@
 (defvar tasks--project-last-run-command-map (make-hash-table :size 100))
 (defvar tasks--last-run-command nil)
 
-(defun tasks-wrap-command (cmd)
-  "Integrate a command with tasks.
-CMD: command function."
-  (setq tasks--last-run-command cmd)
-  (puthash (project-current) cmd tasks--project-last-run-command-map)
-  (call-interactively cmd))
+(defun tasks-wrap-function (fn)
+  "Integrate function FN with tasks."
+  (setq tasks--last-run-command fn)
+  (puthash (project-current) fn tasks--project-last-run-command-map)
+  (call-interactively fn))
+
+(defun tasks-wrap-compile-command (command)
+  "Integrate compile COMMAND with tasks.
+COMMAND: string or Emacs Lisp expression, used as the first parameter of
+`compile' command.
+Some variables are provided to use in COMMAND lisp expression.  To learn these
+variables, please see the source code of this function."
+  (let* ((file-extension (file-name-extension buffer-file-name))
+         (file-name (file-name-nondirectory buffer-file-name))
+
+         (directory-path (file-name-directory buffer-file-name))
+
+         (project-root-path (when (project-current) (project-root (project-current))))
+         (project-rel-file-path
+          (when project-root-path
+            (file-relative-name buffer-file-name project-root-path)))
+         (bare-project-rel-file-path (file-name-sans-extension project-rel-file-path))
+
+         (base-path (if project-root-path project-root-path directory-path))
+         (rel-file-path (file-relative-name buffer-file-name base-path))
+         (bare-rel-file-path (file-name-sans-extension rel-file-path))
+         (command (eval command `((file-extension . ,file-extension)
+                                  (file-name . ,file-name)
+                                  (directory-path . ,directory-path)
+                                  (project-root-path . ,project-root-path)
+                                  (bare-project-rel-file-path . ,bare-project-rel-file-path)
+                                  (base-path . ,base-path)
+                                  (rel-file-path . ,rel-file-path)
+                                  (bare-rel-file-path . ,bare-rel-file-path)))))
+    (tasks-wrap-function (lambda () (interactive) (compile (eval command))))))
+
+(defun tasks-wrap-thing (thing)
+  "Wrap THING based on its type.
+symbol -> `tasks-wrap-function';
+others -> `tasks-wrap-compile-command'"
+  (if (symbolp thing)
+      (tasks-wrap-function thing)
+    (tasks-wrap-compile-command thing)))
 
 (defun tasks-run ()
   "Run function FN."
@@ -93,8 +130,11 @@ NAME, ARGLIST and ARGS see `transient-define-prefix'."
   (let ((wrapped-args (tasks--wrap-suffix-args args)))
     `(transient-define-prefix ,name ,arglist ,@wrapped-args)))
 
+
 (defun tasks--wrap-suffix-args (args)
-  "Wrap commands in suffix ARGS before they get parsed."
+  "Wrap commands in suffix ARGS before they get parsed.
+COMPILE: boolean.  Non-nil means the user use use compile string in the place of
+function."
   (mapcar (lambda (arg)
             (cond
              ((vectorp arg)
@@ -103,13 +143,15 @@ NAME, ARGLIST and ARGS see `transient-define-prefix'."
           args))
 
 (defun tasks--wrap-suffix-vector (vec)
-  "Wrap commands in suffix vector VEC."
-  (vconcat 
+  "Wrap commands in suffix vector VEC.
+COMPILE: boolean.  Non-nil means the user use use compile string in the place of
+function."
+  (vconcat
    (mapcar (lambda (item)
              (cond
               ((vectorp item)
                (tasks--wrap-suffix-vector item))
-              ((and (listp item) 
+              ((and (listp item)
                     (>= (length item) 3)
                     (stringp (nth 0 item))
                     (stringp (nth 1 item)))
@@ -119,12 +161,14 @@ NAME, ARGLIST and ARGS see `transient-define-prefix'."
            (append vec nil))))
 
 (defun tasks--wrap-suffix-tuple (tuple)
-  "Wrap command in suffix TUPLE."
+  "Wrap command in suffix TUPLE.
+COMPILE: boolean.  Non-nil means use `tasks-wrap-compile-command' instead of
+`tasks-wrap-command' to wrap command."
   (let ((key (nth 0 tuple))
         (desc (nth 1 tuple))
         (cmd (nth 2 tuple))
         (rest (nthcdr 3 tuple)))
-    `(,key ,desc (lambda () (interactive) (tasks-wrap-command #',cmd)) ,@rest)))
+    `(,key ,desc (lambda () (interactive) (tasks-wrap-thing #',cmd)) ,@rest)))
 
 
 (provide 'tasks)
