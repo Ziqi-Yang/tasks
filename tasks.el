@@ -81,6 +81,7 @@ variables, please see the source code of this function."
                                   (base-path . ,base-path)
                                   (rel-file-path . ,rel-file-path)
                                   (bare-rel-file-path . ,bare-rel-file-path)))))
+    (message "%s" (transient-arg-value "--package=" (transient-args transient-current-command)))
     (tasks-wrap-function (lambda () (interactive) (compile (eval command))))))
 
 (defun tasks-wrap-thing (thing)
@@ -116,6 +117,15 @@ others -> `tasks-wrap-compile-command'"
     (if cmd
         (call-interactively cmd)
       (call-interactively #'tasks-project-run))))
+
+(defun tasks-transient-get-arg (arg)
+  "Get CLI version of ARG of `transient-current-command'.
+If there is no such ARG or ARG is nil, then return nil"
+  (let ((value (transient-arg-value arg (transient-args transient-current-command))))
+    (when value
+      (if (string-suffix-p "=" arg)
+          (concat arg value)
+        (concat arg "=" value)))))
 
 (defmacro tasks-transient-define-prefix (name arglist &rest args)
   "Define transient menu for tasks.
@@ -168,7 +178,9 @@ COMPILE: boolean.  Non-nil means use `tasks-wrap-compile-command' instead of
         (desc (nth 1 tuple))
         (cmd (nth 2 tuple))
         (rest (nthcdr 3 tuple)))
-    `(,key ,desc (lambda () (interactive) (tasks-wrap-thing #',cmd)) ,@rest)))
+    (if (function-alias-p cmd)
+        tuple  ; so that we can use `transient-define-argument' to define infix
+      `(,key ,desc (lambda () (interactive) (tasks-wrap-thing #',cmd)) ,@rest))))
 
 
 (provide 'tasks)
