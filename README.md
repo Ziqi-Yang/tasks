@@ -62,7 +62,7 @@ Example:
 Currently, `tasks` provides:
 
 - `tasks-transient-define-prefix` as a modified version of `transient-define-prefix`,
-  through which you can easily define a transient menu for easily manage and invoke
+  through which you can define a transient menu for easily managing and invoking
   tasks. (NOTE excellent resource to learn transient: [transient-showcase](https://github.com/positron-solutions/transient-showcase))
   Example Usage:
   ```emacs-lisp
@@ -79,16 +79,16 @@ Currently, `tasks` provides:
 
   `tasks-transient-define-prefix` has some special modifications of `transient-define-prefix`.
   For command definition `("pc" "check" "echo 1")`, for the third argument:
-  - when it is function-alias type, it is handled the same as `transient-define-prefix`
+  - when it is function-alias type (e.g defined by `transient-define-argument` macro), it is handled the same as `transient-define-prefix`
   - when it is symbol type, it is treated as a command (interactive function) and
-    wrapped by `tasks-wrap-thing ` to integrate `run-last-command` function working.
-  - when it is other type, it is evaluated as an Emacs expression using `eval`. Some
+    wrapped by `tasks-wrap-thing ` to make sure `run-last-command` function working.
+  - when it is of other types, it is evaluated as an Emacs expression using `eval`. Some
     convenient variables such as `directory-path`, `file-name`, `rel-file-path` are
     provided so you can directly use them like `(concat "echo " file-name)`. More
     information can be referred from `tasks-wrap-compile-command` command (see its source
     code).
     Since transient normally treat expression as infix expression when the third
-    argument is string type or list type, e.g. `("-s" "switch" "--switch")`. We
+    argument is string type or list type, e.g. `("-s" "switch" "--switch")`, We
     recommend to use utility macros like `transient-define-argument` to define infix
     arguments. For example:
     ```emacs-slip
@@ -97,6 +97,9 @@ Currently, `tasks` provides:
         :argument "--package=")
     ```
 
+- `tasks-transient-get-arg`: get the value of transient infix argument and
+  return a `-a=v` like string.
+     
 - `tasks-wrap-thing`, `tasks-wrap-function` and `tasks-wrap-compile-command`
   for wrap your command with `tasks`.
   Currently this wrapper record the last run command so that you can invoke
